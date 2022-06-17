@@ -10,70 +10,58 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
-import android.view.Display;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
 import android.widget.FrameLayout;
 import androidx.appcompat.app.AppCompatActivity;
 
 
 //TODO : Herausfinden ob der Ball am Anfang immer nach unten rollt oder nur weil mein Handy nicht gerade liegt
 
+/** View-Class that creates the gaming levels */
 public class GameView extends AppCompatActivity {
 
-    private SimulationView mSimulationView;
+    private GenerateLevels mGenerateLevels;
     private SensorManager mSensorManager;
-    private Display mDisplay;
 
-    /** Called when the activity is first created. */
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.gametable);
+
         // Get an instance of the SensorManager
         mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
 
-
-        // Get an instance of the WindowManager
-        WindowManager mWindowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        mDisplay = mWindowManager.getDefaultDisplay();
-
-
         // instantiate our simulation view and set it as the activity's content
-        mSimulationView = new SimulationView(this);
-        mSimulationView.setBackgroundResource(R.drawable.wood);
-        setContentView(mSimulationView);
+        mGenerateLevels = new GenerateLevels(this);
+        mGenerateLevels.setBackgroundResource(R.drawable.wood);
+        setContentView(mGenerateLevels);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-
         // Start the simulation
-        mSimulationView.startSimulation();
+        mGenerateLevels.startSimulation();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-
         // Stop the simulation
-        mSimulationView.stopSimulation();
+        mGenerateLevels.stopSimulation();
 
     }
 
-    class SimulationView extends FrameLayout implements SensorEventListener {
-        // diameter of the balls in meters
+    /** Class that creates the all the the stuff for the levels */
+    class GenerateLevels extends FrameLayout implements SensorEventListener {
+
         private static final float sBallDiameter = 0.004f;
-        //private static final float sBallDiameter2 = sBallDiameter * sBallDiameter;
-
-        private final int mDstWidth;
-        private final int mDstHeight;
-
+        private final int displayWidth;
+        private final int displayHeight;
         private final Sensor mAccelerometer;
-        private long mLastT;
-
+        private long lastTimeStamp;
         private final float mMetersToPixelsX;
         private final float mMetersToPixelsY;
         private float mXOrigin;
@@ -84,29 +72,25 @@ public class GameView extends AppCompatActivity {
         private float mSensorZ;
         private float mHorizontalBound;
         private float mVerticalBound;
-        //private final ParticleSystem mParticleSystem;
-        private Particle mBalls;
-        private Particle mBall;
-        /*
-         * Each of our particle holds its previous and current position, its
-         * acceleration. for added realism each particle has its own friction
-         * coefficient.
-         */
 
-        class Particle extends View {
+        private Ball ball;
+
+        /** creates the Ball with its physics*/
+        class Ball extends View {
             private float mPosX = (float) Math.random();
             private float mPosY = (float) Math.random();
             private float mVelX;
             private float mVelY;
 
-            public Particle(Context context) {
+            /** Constructor, set the Backgroundimage and adds it as a layer to the Activity */
+            public Ball(Context context) {
                 super(context);
                 this.setBackgroundResource(R.drawable.ball);
                 this.setLayerType(LAYER_TYPE_HARDWARE, null);
-                addView(this, new ViewGroup.LayoutParams(mDstWidth, mDstHeight));
+                addView(this, new ViewGroup.LayoutParams(displayWidth, displayHeight));
             }
 
-
+            /** method to simulte the physicis of the ball, credits: AccelerometerPlay */
             public void computePhysics(float sx, float sy, float dT) {
 
                 final float ax = -sx/5;
@@ -119,12 +103,8 @@ public class GameView extends AppCompatActivity {
                 mVelY += ay * dT;
             }
 
-            /*
-             * Resolving constraints and collisions with the Verlet integrator
-             * can be very simple, we simply need to move a colliding or
-             * constrained particle in such way that the constraint is
-             * satisfied.
-             */
+            /** computes the border, so that the ball cant fall of, credits: AccelerometerPlay
+             * collision is calculated with the Verlet integrator */
             public void resolveCollisionWithBounds() {
                 final float xmax = mHorizontalBound;
                 final float ymax = mVerticalBound;
@@ -146,37 +126,44 @@ public class GameView extends AppCompatActivity {
                 }
             }
 
+            /** update the balls's position, only if some time has passed, Credits: AccelerometerPlay
+             * modified by me to fit the projects.
+             * @param sx x coordinate from sensor
+             * @param sy y coordinate from sensor
+             * @param now times of calling the function
+             */
             public void update(float sx, float sy, long now) {
-                // update the system's positions
                 final long t = now;
-                if (mLastT != 0) {
-                    final float dT = (float) (t - mLastT) / 1000.f;
+                if (lastTimeStamp != 0) {
+                    final float dT = (float) (t - lastTimeStamp) / 1000.f;
                     this.computePhysics(sx, sy, dT);
                 }
-                mLastT = t;
+                lastTimeStamp = t;
                 this.resolveCollisionWithBounds();
             }
 
-
+            /** returns the current X-Coordinate */
             public float getPosX() {
                 return this.mPosX;
             }
-
+            /** returns the current Y-Coordinate */
             public float getPosY() {
                 return this.mPosY;
             }
         }
 
-
+        /** starts the Simulation by registering a SensorManager*/
         public void startSimulation() {
             mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_GAME);
         }
 
+        /** stops the Simulation by unregistering a SensorManager*/
         public void stopSimulation() {
             mSensorManager.unregisterListener(this);
         }
 
-        public SimulationView(Context context) {
+        /** Constructor */
+        public GenerateLevels(Context context) {
             super(context);
             mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
 
@@ -188,9 +175,9 @@ public class GameView extends AppCompatActivity {
             mMetersToPixelsY = mYDpi / 0.0254f;
 
             // rescale the ball
-            mDstWidth = (int) (sBallDiameter * mMetersToPixelsX + 10.75f);
-            mDstHeight = (int) (sBallDiameter * mMetersToPixelsY + 10.75f);
-            mBall = new Particle(getContext());
+            displayWidth = (int) (sBallDiameter * mMetersToPixelsX + 10.75f);
+            displayHeight = (int) (sBallDiameter * mMetersToPixelsY + 10.75f);
+            ball = new Ball(getContext());
 
             BitmapFactory.Options opts = new BitmapFactory.Options();
             opts.inDither = true;
@@ -201,12 +188,13 @@ public class GameView extends AppCompatActivity {
         protected void onSizeChanged(int w, int h, int oldw, int oldh) {
             // compute the origin of the screen relative to the origin of
             // the bitmap
-            mXOrigin = (w - mDstWidth) * 0.5f;
-            mYOrigin = (h - mDstHeight) * 0.5f;
+            mXOrigin = (w - displayWidth) * 0.5f;
+            mYOrigin = (h - displayHeight) * 0.5f;
             mHorizontalBound = ((w / mMetersToPixelsX - sBallDiameter) * 0.5f);
             mVerticalBound = ((h / mMetersToPixelsY - sBallDiameter) * 0.5f);
         }
 
+        /** reads the Sensor data into variables.  */
         @Override
         public void onSensorChanged(SensorEvent event) {
             if (event.sensor.getType() != Sensor.TYPE_ACCELEROMETER)
@@ -216,18 +204,19 @@ public class GameView extends AppCompatActivity {
             mSensorZ = event.values[2];
         }
 
+        /** draws the ball onto the canvas*/
         @Override
         protected void onDraw(Canvas canvas) {
             /*
              * Compute the new position of our object, based on accelerometer
              * data and present time.
              */
-            final Particle particle = mBall;
+            final Ball ball = this.ball;
             final long now = System.currentTimeMillis();
             final float sx = mSensorX;
             final float sy = mSensorY;
 
-            particle.update(sx, sy, now);
+            ball.update(sx, sy, now);
 
             final float xc = mXOrigin;
             final float yc = mYOrigin;
@@ -238,10 +227,10 @@ public class GameView extends AppCompatActivity {
                  * the sensors coordinate system with the origin in the center
                  * of the screen and the unit is the meter.
                  */
-                final float x = xc + particle.getPosX() * xs;
-                final float y = yc - particle.getPosY() * ys;
-                mBall.setTranslationX(x);
-                mBall.setTranslationY(y);
+                final float x = xc + ball.getPosX() * xs;
+                final float y = yc - ball.getPosY() * ys;
+                this.ball.setTranslationX(x);
+                this.ball.setTranslationY(y);
 
             // and make sure to redraw asap
             invalidate();
