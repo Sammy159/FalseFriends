@@ -1,6 +1,5 @@
 package com.example.sensorplaytest3;
 
-import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -9,24 +8,22 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.os.Build;
 import android.os.Bundle;
-import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.view.Display;
-import android.view.Surface;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
-
 import androidx.appcompat.app.AppCompatActivity;
+
+
+//TODO : Herausfinden ob der Ball am Anfang immer nach unten rollt oder nur weil mein Handy nicht gerade liegt
 
 public class GameView extends AppCompatActivity {
 
     private SimulationView mSimulationView;
     private SensorManager mSensorManager;
-    private WindowManager mWindowManager;
     private Display mDisplay;
 
     /** Called when the activity is first created. */
@@ -39,7 +36,7 @@ public class GameView extends AppCompatActivity {
 
 
         // Get an instance of the WindowManager
-        mWindowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        WindowManager mWindowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         mDisplay = mWindowManager.getDefaultDisplay();
 
 
@@ -52,11 +49,6 @@ public class GameView extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        /*
-         * when the activity is resumed, we acquire a wake-lock so that the
-         * screen stays on, since the user will likely not be fiddling with the
-         * screen or buttons.
-         */
 
         // Start the simulation
         mSimulationView.startSimulation();
@@ -65,10 +57,6 @@ public class GameView extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        /*
-         * When the activity is paused, we make sure to stop the simulation,
-         * release our sensor resources
-         */
 
         // Stop the simulation
         mSimulationView.stopSimulation();
@@ -78,31 +66,33 @@ public class GameView extends AppCompatActivity {
     class SimulationView extends FrameLayout implements SensorEventListener {
         // diameter of the balls in meters
         private static final float sBallDiameter = 0.004f;
-        private static final float sBallDiameter2 = sBallDiameter * sBallDiameter;
+        //private static final float sBallDiameter2 = sBallDiameter * sBallDiameter;
 
         private final int mDstWidth;
         private final int mDstHeight;
 
-        private Sensor mAccelerometer;
+        private final Sensor mAccelerometer;
         private long mLastT;
 
-        private float mXDpi;
-        private float mYDpi;
-        private float mMetersToPixelsX;
-        private float mMetersToPixelsY;
+        private final float mMetersToPixelsX;
+        private final float mMetersToPixelsY;
         private float mXOrigin;
         private float mYOrigin;
         private float mSensorX;
         private float mSensorY;
+        //TODO : Z Achse berücksitigen, in späteren Level
+        private float mSensorZ;
         private float mHorizontalBound;
         private float mVerticalBound;
-        private final ParticleSystem mParticleSystem;
+        //private final ParticleSystem mParticleSystem;
         private Particle mBalls;
+        private Particle mBall;
         /*
          * Each of our particle holds its previous and current position, its
          * acceleration. for added realism each particle has its own friction
          * coefficient.
          */
+
         class Particle extends View {
             private float mPosX = (float) Math.random();
             private float mPosY = (float) Math.random();
@@ -111,21 +101,11 @@ public class GameView extends AppCompatActivity {
 
             public Particle(Context context) {
                 super(context);
+                this.setBackgroundResource(R.drawable.ball);
+                this.setLayerType(LAYER_TYPE_HARDWARE, null);
+                addView(this, new ViewGroup.LayoutParams(mDstWidth, mDstHeight));
             }
 
-            public Particle(Context context, AttributeSet attrs) {
-                super(context, attrs);
-            }
-
-            public Particle(Context context, AttributeSet attrs, int defStyleAttr) {
-                super(context, attrs, defStyleAttr);
-            }
-
-            @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-            public Particle(Context context, AttributeSet attrs, int defStyleAttr,
-                            int defStyleRes) {
-                super(context, attrs, defStyleAttr, defStyleRes);
-            }
 
             public void computePhysics(float sx, float sy, float dT) {
 
@@ -165,67 +145,30 @@ public class GameView extends AppCompatActivity {
                     mVelY = 0;
                 }
             }
-        }
 
-        /*
-         * A particle system is just a collection of particles
-         */
-        class ParticleSystem {
-            static final int NUM_PARTICLES = 1;
-
-            ParticleSystem() {
-                /*
-                 * Initially our particles have no speed or acceleration
-                 */
-                    mBalls = new Particle(getContext());
-                    mBalls.setBackgroundResource(R.drawable.ball);
-                    mBalls.setLayerType(LAYER_TYPE_HARDWARE, null);
-                    addView(mBalls, new ViewGroup.LayoutParams(mDstWidth, mDstHeight));
-                }
-
-            /*
-             * Update the position of each particle in the system using the
-             * Verlet integrator.
-             */
-            private void updatePositions(float sx, float sy, long timestamp) {
-                final long t = timestamp;
-                if (mLastT != 0) {
-                    final float dT = (float) (t - mLastT) / 1000.f /** (1.0f / 1000000000.0f)*/;
-                        mBalls.computePhysics(sx, sy, dT);
-                }
-                mLastT = t;
-            }
-
-            /*
-             * Performs one iteration of the simulation. First updating the
-             * position of all the particles and resolving the constraints and
-             * collisions.
-             */
             public void update(float sx, float sy, long now) {
                 // update the system's positions
-                updatePositions(sx, sy, now);
-                mBalls.resolveCollisionWithBounds();
+                final long t = now;
+                if (mLastT != 0) {
+                    final float dT = (float) (t - mLastT) / 1000.f;
+                    this.computePhysics(sx, sy, dT);
+                }
+                mLastT = t;
+                this.resolveCollisionWithBounds();
             }
 
 
             public float getPosX() {
-                return mBalls.mPosX;
+                return this.mPosX;
             }
 
             public float getPosY() {
-                return mBalls.mPosY;
+                return this.mPosY;
             }
         }
 
 
         public void startSimulation() {
-            /*
-             * It is not necessary to get accelerometer events at a very high
-             * rate, by using a slower rate (SENSOR_DELAY_UI), we get an
-             * automatic low-pass filter, which "extracts" the gravity component
-             * of the acceleration. As an added benefit, we use less power and
-             * CPU resources.
-             */
             mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_GAME);
         }
 
@@ -239,15 +182,15 @@ public class GameView extends AppCompatActivity {
 
             DisplayMetrics metrics = new DisplayMetrics();
             getWindowManager().getDefaultDisplay().getMetrics(metrics);
-            mXDpi = metrics.xdpi;
-            mYDpi = metrics.ydpi;
+            float mXDpi = metrics.xdpi;
+            float mYDpi = metrics.ydpi;
             mMetersToPixelsX = mXDpi / 0.0254f;
             mMetersToPixelsY = mYDpi / 0.0254f;
 
-            // rescale the ball so it's about 0.5 cm on screen
-            mDstWidth = (int) (sBallDiameter * mMetersToPixelsX + 0.5f);
-            mDstHeight = (int) (sBallDiameter * mMetersToPixelsY + 0.5f);
-            mParticleSystem = new ParticleSystem();
+            // rescale the ball
+            mDstWidth = (int) (sBallDiameter * mMetersToPixelsX + 10.75f);
+            mDstHeight = (int) (sBallDiameter * mMetersToPixelsY + 10.75f);
+            mBall = new Particle(getContext());
 
             BitmapFactory.Options opts = new BitmapFactory.Options();
             opts.inDither = true;
@@ -268,33 +211,9 @@ public class GameView extends AppCompatActivity {
         public void onSensorChanged(SensorEvent event) {
             if (event.sensor.getType() != Sensor.TYPE_ACCELEROMETER)
                 return;
-            /*
-             * record the accelerometer data, the event's timestamp as well as
-             * the current time. The latter is needed so we can calculate the
-             * "present" time during rendering. In this application, we need to
-             * take into account how the screen is rotated with respect to the
-             * sensors (which always return data in a coordinate space aligned
-             * to with the screen in its native orientation).
-             */
-
-            switch (mDisplay.getRotation()) {
-                case Surface.ROTATION_0:
-                    mSensorX = event.values[0];
-                    mSensorY = event.values[1];
-                    break;
-                case Surface.ROTATION_90:
-                    mSensorX = -event.values[1];
-                    mSensorY = event.values[0];
-                    break;
-                case Surface.ROTATION_180:
-                    mSensorX = -event.values[0];
-                    mSensorY = -event.values[1];
-                    break;
-                case Surface.ROTATION_270:
-                    mSensorX = event.values[1];
-                    mSensorY = -event.values[0];
-                    break;
-            }
+            mSensorX = event.values[0];
+            mSensorY = event.values[1];
+            mSensorZ = event.values[2];
         }
 
         @Override
@@ -303,12 +222,12 @@ public class GameView extends AppCompatActivity {
              * Compute the new position of our object, based on accelerometer
              * data and present time.
              */
-            final ParticleSystem particleSystem = mParticleSystem;
+            final Particle particle = mBall;
             final long now = System.currentTimeMillis();
             final float sx = mSensorX;
             final float sy = mSensorY;
 
-            particleSystem.update(sx, sy, now);
+            particle.update(sx, sy, now);
 
             final float xc = mXOrigin;
             final float yc = mYOrigin;
@@ -319,10 +238,10 @@ public class GameView extends AppCompatActivity {
                  * the sensors coordinate system with the origin in the center
                  * of the screen and the unit is the meter.
                  */
-                final float x = xc + particleSystem.getPosX() * xs;
-                final float y = yc - particleSystem.getPosY() * ys;
-                mBalls.setTranslationX(x);
-                mBalls.setTranslationY(y);
+                final float x = xc + particle.getPosX() * xs;
+                final float y = yc - particle.getPosY() * ys;
+                mBall.setTranslationX(x);
+                mBall.setTranslationY(y);
 
             // and make sure to redraw asap
             invalidate();
