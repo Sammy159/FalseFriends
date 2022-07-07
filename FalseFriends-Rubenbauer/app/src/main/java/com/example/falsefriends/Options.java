@@ -55,8 +55,11 @@ public class Options extends AppCompatActivity implements View.OnClickListener{
         tv_ip = (TextView) this.findViewById(R.id.tv_ip);
         ipinput = (TextInputEditText) this.findViewById(R.id.tf_ipinput);
 
+        SharedPreferences prefBroker = getSharedPreferences("TCP", Context.MODE_PRIVATE);
+        String broker = prefBroker.getString("broker", "tcp://192.168.137.2:1883");
         //only visible if raspberry pi is selected
         tv_ip.setVisibility(View.INVISIBLE);
+        ipinput.setText(broker);
         ipinput.setVisibility(View.INVISIBLE);
         useIpAddress.setEnabled(false);
 
